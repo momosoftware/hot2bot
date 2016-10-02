@@ -27,11 +27,24 @@
 
 ## Installation
 
-* install cobe and python-twitter
-* put your API credentials in
-* run with `python main.py`
+**Install Cobe**:
+* `git clone`
+* Navigate to the cobe directory
+* `easy_install cobe`
 
-proper instructions coming soonish
+**Install Python-Twitter**:
+* `pip install python-twitter`
+
+**Use hot2bot**:
+* navigate to the hot2bot directory
+* Run `cobe init` to create a Cobe Brain for hot2bot to operate with
+* At the [Twitter Apps](https://apps.twitter.com/) page, create a new twitter app.
+* Give it a unique name, a description, fill in the [hot2bot github page](https://github.com/acostoss/hot2bot) for the website. Leave callback blank, Accept the agreement, and click the "Create your app" button
+* On your app  management screen, click the "Keys and Access Tokens" tab
+* Generate Access tokens. Take note of the Consumer Key, Consumer Secret, Access Token and Access Token Secret
+* Copy/rename `config.default.conf` to `config.conf`
+* Fill in the Consumer and Token info on the corresponding lines, without quotes.
+* Run with `python main.py`. It will begin learning from your timeline every minute and posting every 60 minutes. If you'd like it to post more often, change the `tweetFrequency` value in the config file
 
 ## Credits
 Credit to [@Masaka_Arienai](https://twitter.com/Masaka_Arienai) on Twitter [for the name](https://twitter.com/Masaka_Arienai/status/782644624288575492)
