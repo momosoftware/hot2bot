@@ -17,9 +17,9 @@
 
 * Reply to tweets w/ a random seed word from their tweet
 * Reply to DMs in a similar fashion
-* Make a proper config file
+* ~~Make a proper config file~~ done!
 * log to file instead of console
-* More options to ecide how it functions
+* More options to decide how it functions
 * Possibly write to use Classes and Methods instead of Functions
 
 
