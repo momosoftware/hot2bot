@@ -28,7 +28,7 @@
 ## Installation
 
 **Install Cobe**:
-* `git clone`
+* `git clone https://github.com/pteichman/cobe.git`
 * Navigate to the cobe directory
 * `easy_install cobe`
 
