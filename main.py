@@ -125,22 +125,24 @@ def subtweet(subtweetCorpus):
 # init our parser and our cobe brain
 b = Brain('cobe.brain')
 
-# Auth to mastodon
-oauth = OAuth2Session(mastodonID, token=dict(access_token=mastodonToken), redirect_uri=redirectURI)
-
 #connect to the api
 api = twitter.Api(consumer_key=consumerKey,consumer_secret=consumerSecret,access_token_key=tokenKey,access_token_secret=tokenSecret)
 print(api.VerifyCredentials())
 
 if useMastodon:
-    authURL, state = oauth.authorization_url('https://mastodon.social/oauth/authorize')
+    # Auth to mastodon
+    if mastodonToken:
+        oauth = OAuth2Session(mastodonID, token=dict(access_token=mastodonToken), redirect_uri=redirectURI)
+    else:
+        oauth = OAuth2Session(mastodonID, redirect_uri=redirectURI)
 
-    print 'Please go to %s and authorize access.' % authURL
-    accessCode = raw_input('Enter access code')
+        authURL, state = oauth.authorization_url('https://mastodon.social/oauth/authorize')
 
-    token = oauth.fetch_token('https://mastodon.social/oauth/token', code=accessCode, client_secret=mastodonSecret)
+        print 'Please go to %s and authorize access' % authURL
+        accessCode = raw_input('Enter access code: ')
 
-# print 'Your access token is %s' % token
+        token = oauth.fetch_token('https://mastodon.social/oauth/token', code=accessCode, client_secret=mastodonSecret)
+        print 'Your access token is: %s' % token
 
 """
     main loop
@@ -161,29 +163,37 @@ if useMastodon:
 """
 while 1:
     timeCount = timeCount + 1
+
     if useMastodon and learnMastodon:
         timeline = oauth.get('https://mastodon.social/api/v1/statuses/home', params=dict(limit=tweetCount, since_id=lastId)).json()
     else:
         timeline = api.GetHomeTimeline(exclude_replies=True, count=tweetCount, since_id=lastId)
 
     for s in timeline:
-        statuses = statuses + ' ' + s.text
-        print "learning " + s.text
-        b.learn(s.text)
+        if useMastodon:
+            statusText = strip_tags(s['content'])
+        else:
+            statusText = s.text
+
+        statuses = statuses + ' ' + statusText
+        print "learning " + statusText
+        b.learn(statusText)
+
     if useMastodon:
-        lastTweet = timeline[0]
+        lastId = timeline[0]['id']
     else:
-        lastTweet = timeline[-1]
+        lastId = timeline[-1].id
 
     print lastId
-    lastId = lastTweet.id
-    print lastId
+
     if timeCount >= tweetFreq:
         print "TWEETING TIME"
+
         if random.randint(0,100) < subtweetChance:
             tweet = b.reply(subtweet(statuses))
         else:
             tweet = b.reply('')
+
         print tweet
 
         tweet = re.sub(r'@\w+', r'', tweet)
@@ -200,6 +210,7 @@ while 1:
             pass
 
         print 'emptying our vars now'
+
         timeCount = 0
         statuses = ""
         statusesWords = []
