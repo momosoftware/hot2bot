@@ -16,6 +16,7 @@
 ## To Do
 
 * Save lastId to config file in case of restart (in prep for replies as to not spam on restart)
+* Test Mastodon integration more fully, expand readme with instructions for it
 * Reply to tweets w/ a random seed word from their tweet
 * Reply to DMs in a similar fashion
 * ~~Make a proper config file~~ done!
@@ -36,8 +37,8 @@
 **Install Python-Twitter**:
 * `pip install python-twitter`
 
-**Use hot2bot**:
-* navigate to the hot2bot directory
+**Use hot2bot with Twitter**:
+* Navigate to the hot2bot directory
 * Run `cobe init` to create a Cobe Brain for hot2bot to operate with
 * At the [Twitter Apps](https://apps.twitter.com/) page, create a new twitter app.
 * Give it a unique name, a description, fill in the [hot2bot github page](https://github.com/acostoss/hot2bot) for the website. Leave callback blank, Accept the agreement, and click the "Create your app" button
