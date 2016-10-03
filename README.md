@@ -2,11 +2,11 @@
 
 ## Synopsis
 
-#### Python Twitter bot framework for use with Cobe
+#### Python Twitter bot framework for use with [Cobe](https://github.com/pteichman/cobe)
 
 **Currently**:
 
-* Authenticates to twitter
+* Authenticates to Twitter or [Mastodon](https://github.com/Gargron/mastodon)
 * Grabs timeline since last run
 * Has Cobe learn the statuses
 * Tweets:
@@ -15,6 +15,7 @@
 
 ## To Do
 
+* Save lastId to config file in case of restart (in prep for replies as to not spam on restart)
 * Reply to tweets w/ a random seed word from their tweet
 * Reply to DMs in a similar fashion
 * ~~Make a proper config file~~ done!
@@ -27,7 +28,7 @@
 
 ## Installation
 
-**Install Cobe**:
+**Install [Cobe](https://github.com/pteichman/cobe)**:
 * `git clone https://github.com/pteichman/cobe.git`
 * Navigate to the cobe directory
 * `easy_install cobe`
@@ -48,6 +49,8 @@
 
 ## Credits
 Credit to [@Masaka_Arienai](https://twitter.com/Masaka_Arienai) on Twitter [for the name](https://twitter.com/Masaka_Arienai/status/782644624288575492)
+
+Credit to @Gargron on [Twitter](https://twitter.com/Gargron) and [Github](https://github.com/Gargron) for the [Mastodon](https://github.com/Gargron/mastodon) integration
 
 ## License
 
