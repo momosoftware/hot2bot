@@ -26,10 +26,9 @@ import twitter
 import unicodedata
 
 config = configparser.RawConfigParser()
-configPath = r'config.conf'
+config.optionxform = str # workaround to make configParser preserve case when writing our config files
+configPath = 'config.conf'
 config.read(configPath)
-
-
 
 # api constants, might move these to a config later
 consumerKey = config.get('api', 'consumerKey')
@@ -42,6 +41,8 @@ tweetFreq  = config.getint('options', 'tweetFrequency') #60 # how many minutes b
 subtweetChance  = config.getint('options', 'chanceToSubtweet') #10 # percent chance that the bot subtweets
 topWords  = config.getint('options', 'topSubtweetSeeds') #5 # number of top words to potentially choose from for our seed phrase
 tweetCount  = config.getint('options', 'maxTimelineTweets') #200 # max number of tweets to pull from timeline, up to 200
+# the id of the last tweet we pulled, in case hot2bot is closed
+lastId = config.get('options', 'lastId')
 
 # mastodon-specific
 useMastodon = config.getboolean('mastodon','useMastodon')
@@ -54,7 +55,6 @@ redirectURI =  config.get('mastodon','redirect_uri')
 mastodonToken = config.get('mastodon','access_token')
 
 # other variables, hugeass list of stopwords from http://www.ranks.nl/stopwords with a couple twitter-specific ones added
-lastId = '1'
 lastMentionId = '1'
 lastDMId = '1'
 statuses = ''
@@ -185,7 +185,7 @@ while 1:
         lastId = timeline[-1].id
 
     print lastId
-
+    config.set("options", "lastId", lastId)
     if timeCount >= tweetFreq:
         print "TWEETING TIME"
 
@@ -218,6 +218,9 @@ while 1:
         counts = []
         seed = ""
         tweet = ""
+
+    with open(configPath, "wb") as configFile:
+        config.write(configFile)
 
     print "sleeping now"
     time.sleep(60) # one minute
