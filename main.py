@@ -17,6 +17,7 @@ from collections import Counter
 from HTMLParser import HTMLParser
 from requests_oauthlib import OAuth2Session
 
+import argparse
 import configparser
 import json
 import random
@@ -24,6 +25,19 @@ import re
 import time
 import twitter
 import unicodedata
+
+
+parser = argparse.ArgumentParser(description='hot2bot')
+parser.add_argument('-i','--init', action='store_true', help='Go through the steps of configuring hot2bot for yuour specific uses. You can skip this step by copying config.default.conf to config.conf, opening it in your favorite editor, and going to town.')
+parser.add_argument('-v', '--verbose', action='stroe_true', help='Show verbose output, including debug messages')
+parser.add_argument('-t', '--tweet', nargs='?', type=str, help='Generate and post a tweet with the provided seed word. If no seed is provided, a random tweet will be generated and posted.')
+
+args = parser.parse_args()
+
+print('init time!') if args.init
+print('verbose') if args.verbose
+print('tweeting {}'.format(args.tweet)) if args.tweet
+
 
 config = configparser.RawConfigParser()
 config.optionxform = str # workaround to make configParser preserve case when writing our config files
