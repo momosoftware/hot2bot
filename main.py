@@ -22,22 +22,21 @@ import configparser
 import json
 import random
 import re
+import sys
 import time
 import twitter
 import unicodedata
 
+#import requests.packages.urllib3
+#requests.packages.urllib3.disable_warnings()
 
-parser = argparse.ArgumentParser(description='hot2bot')
+
+parser = argparse.ArgumentParser(prog='hot2bot', description='It\'s hotter than a Hoochie Coochie! -- Alan Jackson, Chattahoochee')
 parser.add_argument('-i','--init', action='store_true', help='Go through the steps of configuring hot2bot for yuour specific uses. You can skip this step by copying config.default.conf to config.conf, opening it in your favorite editor, and going to town.')
-parser.add_argument('-v', '--verbose', action='stroe_true', help='Show verbose output, including debug messages')
-parser.add_argument('-t', '--tweet', nargs='?', type=str, help='Generate and post a tweet with the provided seed word. If no seed is provided, a random tweet will be generated and posted.')
+parser.add_argument('-v', '--verbose', action='store_true', help='Show verbose output, including debug messages')
+parser.add_argument('-t', '--tweet', nargs='?', type=str, default='' help='Generate and post a tweet with the provided seed word. If no seed is provided, a random tweet will be generated and posted.')
 
 args = parser.parse_args()
-
-print('init time!') if args.init
-print('verbose') if args.verbose
-print('tweeting {}'.format(args.tweet)) if args.tweet
-
 
 config = configparser.RawConfigParser()
 config.optionxform = str # workaround to make configParser preserve case when writing our config files
@@ -105,7 +104,9 @@ def subtweet(subtweetCorpus):
     subtweetCorpus = re.sub(r'\(x[1-9]*\)', r'', subtweetCorpus) # (x1000) rt numbers from oysttyr
     subtweetCorpus = re.sub(r'http[s]?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', r'', subtweetCorpus) # urls
     subtweetCorpus = subtweetCorpus.replace('\n', ' ').replace('\r', '')
-    print subtweetCorpus
+
+    if args.verbose:
+        print subtweetCorpus
 
     # only keep ascii characters from 32-122 in our subtweet corpus
     subtweetCorpus = ''.join([i if ord(i) > 31 and ord(i) < 123 else '' for i in subtweetCorpus])
@@ -121,27 +122,34 @@ def subtweet(subtweetCorpus):
         word = re.sub(r'[^\w]', '', word)
         if word.lower() not in stopwords:
             remainingWords.append(word)
-    print remainingWords
+    if args.verbose:
+        print remainingWords
 
     # there might be zero-length strings in our list, so join our list into a string (delimited by spaces) then split again!
     remainingWords = ' '.join(remainingWords).split()
-    print remainingWords
+    if args.verbose:
+        print remainingWords
 
     # count all of our words, saving this to a list of tuples containing the top words and how often they appeared
     counts = [word for word, count in Counter(remainingWords).most_common(topWords)]
-    print 'top ' + str(topWords) + ' counted terms: ' + ', '.join(counts)
+    if args.verbose:
+        print 'top ' + str(topWords) + ' counted terms: ' + ', '.join(counts)
 
     # choose a random word from our list to use as a seed, and return it
     seed = random.choice(counts)
-    print seed
+    if args.verbose:
+        print seed
     return seed
+
+
 
 # init our parser and our cobe brain
 b = Brain('cobe.brain')
 
 #connect to the api
 api = twitter.Api(consumer_key=consumerKey,consumer_secret=consumerSecret,access_token_key=tokenKey,access_token_secret=tokenSecret)
-print(api.VerifyCredentials())
+if args.verbose:
+    print(api.VerifyCredentials())
 
 if useMastodon:
     # Auth to mastodon
@@ -152,11 +160,49 @@ if useMastodon:
 
         authURL, state = oauth.authorization_url('https://mastodon.social/oauth/authorize')
 
-        print 'Please go to %s and authorize access' % authURL
+        if args.verbose:
+            print 'Please go to %s and authorize access' % authURL
         accessCode = raw_input('Enter access code: ')
 
         token = oauth.fetch_token('https://mastodon.social/oauth/token', code=accessCode, client_secret=mastodonSecret)
-        print 'Your access token is: %s' % token
+        if args.verbose:
+            print 'Your access token is: %s' % token
+
+
+def postTweet(tweet):
+    if args.verbose:
+            print tweet
+
+    tweet = re.sub(r'@\w+', r'', tweet)
+    tweet = re.sub(r'#\w+', r'', tweet)
+    tweet = re.sub(r'\(x[1-9]*\)', r'', tweet)
+    tweet = re.sub(r'http[s]?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', r'', tweet)
+
+    try:
+        if useMastodon:
+            oauth.post('https://mastodon.social/api/v1/statuses', data=dict(status=tweet))
+        else:
+            api.PostUpdate(tweet)
+    except:
+        pass
+
+def manualTweet(seed):
+    tweet = b.reply(seed)
+    postTweet(tweet)
+
+
+"""
+    special args cases
+
+    Cases where special arguments take precedence over the main loop,
+    and often end hot2bot once they complete
+
+"""
+
+if args.tweet:
+    manualTweet(args.tweet)
+    quit()
+
 
 """
     main loop
@@ -164,14 +210,15 @@ if useMastodon:
     Increments a counter, and grabs our timeline, only pulling since the last tweet we pulled.
     Learns all tweets.
     If counter is greater than our tweetFreq variable, we also post a tweet.
-        First we find out if we'll subtweet by choosing a random in from 0-100 and seeing if it is less than our subtweetChance
-        if it is, we'll generate a seed word from the subtweet() function amd use that to generate a tweet through Cobe
-        if not, we'll just generate a tweet without a seed through Cobe.
-        we then remove any mentions, urls, hashtags, and RT counts that Cobe may have returned
 
-        we then post the tweet, ignoring the exception if it is a duplicate tweet.
+    First we find out if we'll subtweet by choosing a random in from 0-100 and seeing if it is less than our subtweetChance
+    - if it is, we'll generate a seed word from the subtweet() function amd use that to generate a tweet through Cobe
+    - if not, we'll just generate a tweet without a seed through Cobe.
+    we then remove any mentions, urls, hashtags, and RT counts that Cobe may have returned
 
-        finally, we reset our variables
+    we then post the tweet, ignoring the exception if it is a duplicate tweet.
+
+    finally, we reset our variables
     we then sleep for a minute before learning and possibly tweeting again
 
 """
@@ -190,7 +237,8 @@ while 1:
             statusText = s.text
 
         statuses = statuses + ' ' + statusText
-        print "learning " + statusText
+        if args.verbose:
+            print "learning " + statusText
         b.learn(statusText)
 
     if useMastodon:
@@ -198,32 +246,21 @@ while 1:
     else:
         lastId = timeline[-1].id
 
-    print lastId
+    if args.verbose:
+        print lastId
     config.set("options", "lastId", lastId)
     if timeCount >= tweetFreq:
-        print "TWEETING TIME"
-
+        if args.verbose:
+            print "TWEETING TIME"
         if random.randint(0,100) < subtweetChance:
             tweet = b.reply(subtweet(statuses))
         else:
             tweet = b.reply('')
 
-        print tweet
+        postTweet(tweet)
 
-        tweet = re.sub(r'@\w+', r'', tweet)
-        tweet = re.sub(r'#\w+', r'', tweet)
-        tweet = re.sub(r'\(x[1-9]*\)', r'', tweet)
-        tweet = re.sub(r'http[s]?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', r'', tweet)
-
-        try:
-            if useMastodon:
-                oauth.post('https://mastodon.social/api/v1/statuses', data=dict(status=tweet))
-            else:
-                api.PostUpdate(tweet)
-        except:
-            pass
-
-        print 'emptying our vars now'
+        if args.verbose:
+            print 'emptying our vars now'
 
         timeCount = 0
         statuses = ""
@@ -236,6 +273,10 @@ while 1:
     with open(configPath, "wb") as configFile:
         config.write(configFile)
 
-    print "sleeping now"
+    if args.verbose:
+        print "sleeping now"
+
     time.sleep(60) # one minute
-    print "I'm awake i swear mom"
+
+    if args.verbose:
+        print "I'm awake i swear mom"
