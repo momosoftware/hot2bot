@@ -34,7 +34,7 @@ import unicodedata
 parser = argparse.ArgumentParser(prog='hot2bot', description='It\'s hotter than a Hoochie Coochie! -- Alan Jackson, Chattahoochee')
 parser.add_argument('-i','--init', action='store_true', help='Go through the steps of configuring hot2bot for yuour specific uses. You can skip this step by copying config.default.conf to config.conf, opening it in your favorite editor, and going to town.')
 parser.add_argument('-v', '--verbose', action='store_true', help='Show verbose output, including debug messages')
-parser.add_argument('-t', '--tweet', nargs='?', type=str, default='' help='Generate and post a tweet with the provided seed word. If no seed is provided, a random tweet will be generated and posted.')
+parser.add_argument('-t', '--tweet', nargs='?', type=str, default='', help='Generate and post a tweet with the provided seed word. If no seed is provided, a random tweet will be generated and posted.')
 
 args = parser.parse_args()
 
@@ -56,6 +56,11 @@ topWords  = config.getint('options', 'topSubtweetSeeds') #5 # number of top word
 tweetCount  = config.getint('options', 'maxTimelineTweets') #200 # max number of tweets to pull from timeline, up to 200
 # the id of the last tweet we pulled, in case hot2bot is closed
 lastId = config.get('options', 'lastId')
+
+
+replyCount = config.getint('options', 'maxTimelineReplies')
+
+lastReplyId = config.get('options','lastReplyId')
 
 # mastodon-specific
 useMastodon = config.getboolean('mastodon','useMastodon')
@@ -106,7 +111,7 @@ def subtweet(subtweetCorpus):
     subtweetCorpus = subtweetCorpus.replace('\n', ' ').replace('\r', '')
 
     if args.verbose:
-        print subtweetCorpus
+        print(subtweetCorpus)
 
     # only keep ascii characters from 32-122 in our subtweet corpus
     subtweetCorpus = ''.join([i if ord(i) > 31 and ord(i) < 123 else '' for i in subtweetCorpus])
@@ -123,22 +128,26 @@ def subtweet(subtweetCorpus):
         if word.lower() not in stopwords:
             remainingWords.append(word)
     if args.verbose:
-        print remainingWords
+        print(remainingWords)
 
     # there might be zero-length strings in our list, so join our list into a string (delimited by spaces) then split again!
     remainingWords = ' '.join(remainingWords).split()
     if args.verbose:
-        print remainingWords
+        print(remainingWords)
 
     # count all of our words, saving this to a list of tuples containing the top words and how often they appeared
     counts = [word for word, count in Counter(remainingWords).most_common(topWords)]
     if args.verbose:
-        print 'top ' + str(topWords) + ' counted terms: ' + ', '.join(counts)
+        print('top ' + str(topWords) + ' counted terms: ' + ', '.join(counts))
 
     # choose a random word from our list to use as a seed, and return it
-    seed = random.choice(counts)
+    if not remainingWords:
+        seed = ""
+    else:
+        seed = random.choice(counts)
+
     if args.verbose:
-        print seed
+        print(seed)
     return seed
 
 
@@ -161,23 +170,28 @@ if useMastodon:
         authURL, state = oauth.authorization_url('https://mastodon.social/oauth/authorize')
 
         if args.verbose:
-            print 'Please go to %s and authorize access' % authURL
+            print('Please go to %s and authorize access' % authURL)
         accessCode = raw_input('Enter access code: ')
 
         token = oauth.fetch_token('https://mastodon.social/oauth/token', code=accessCode, client_secret=mastodonSecret)
         if args.verbose:
-            print 'Your access token is: %s' % token
+            print('Your access token is: %s' % token)
 
 
-def postTweet(tweet):
+def cleanTweet(tweet):
     if args.verbose:
-            print tweet
+            print("Before clean: " + tweet)
 
     tweet = re.sub(r'@\w+', r'', tweet)
     tweet = re.sub(r'#\w+', r'', tweet)
     tweet = re.sub(r'\(x[1-9]*\)', r'', tweet)
     tweet = re.sub(r'http[s]?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', r'', tweet)
+    if args.verbose:
+            print("After clean: " + tweet)
 
+    return tweet
+
+def postTweet(tweet):
     try:
         if useMastodon:
             oauth.post('https://mastodon.social/api/v1/statuses', data=dict(status=tweet))
@@ -190,6 +204,38 @@ def manualTweet(seed):
     tweet = b.reply(seed)
     postTweet(tweet)
 
+
+def reply():
+    replyTimeline = api.GetMentions(count=replyCount, since_id=int(lastReplyId))
+    replyMentions = ""
+
+    for r in replyTimeline:
+        print(r)
+        replyText = r.text
+        replyUser = r.user.screen_name
+        replyId = r.id_str
+        try:
+            replyMentionsList = r.entities.userMentions
+            print("reply = " + replyText)
+            print("mentions = " + replyMentions)
+
+            for m in replyMentionsList:
+                replyMentions = replyMentions + " @" + m.screen_name
+
+            print(replyMentionsList)
+            print(replyMentions)
+        except:
+            pass
+
+
+
+        subtweetReply = b.reply(subtweet(replyText))
+        subtweetReply = "@" + replyUser + " " + replyMentions + " " + cleanTweet(subtweetReply)
+        print("reply id: " + replyId)
+        api.PostUpdate(subtweetReply, in_reply_to_status_id=int(replyId))
+        config.set("options", "lastReplyId", replyId)
+    with open(configPath, "wb") as configFile:
+        config.write(configFile)
 
 """
     special args cases
@@ -224,7 +270,7 @@ if args.tweet:
 """
 while 1:
     timeCount = timeCount + 1
-
+    reply()
     if useMastodon and learnMastodon:
         timeline = oauth.get('https://mastodon.social/api/v1/statuses/home', params=dict(limit=tweetCount, since_id=lastId)).json()
     else:
@@ -238,7 +284,7 @@ while 1:
 
         statuses = statuses + ' ' + statusText
         if args.verbose:
-            print "learning " + statusText
+            print("learning " + statusText)
         b.learn(statusText)
 
     if useMastodon:
@@ -247,20 +293,21 @@ while 1:
         lastId = timeline[-1].id
 
     if args.verbose:
-        print lastId
+        print(lastId)
     config.set("options", "lastId", lastId)
     if timeCount >= tweetFreq:
         if args.verbose:
-            print "TWEETING TIME"
+            print("TWEETING TIME")
         if random.randint(0,100) < subtweetChance:
             tweet = b.reply(subtweet(statuses))
         else:
             tweet = b.reply('')
 
+        tweet = cleanTweet(tweet)
         postTweet(tweet)
 
         if args.verbose:
-            print 'emptying our vars now'
+            print('emptying our vars now')
 
         timeCount = 0
         statuses = ""
@@ -274,9 +321,9 @@ while 1:
         config.write(configFile)
 
     if args.verbose:
-        print "sleeping now"
+        print("sleeping now")
 
     time.sleep(60) # one minute
 
     if args.verbose:
-        print "I'm awake i swear mom"
+        print("I'm awake i swear mom")
