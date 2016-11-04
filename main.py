@@ -57,6 +57,7 @@ tweetCount  = config.getint('options', 'maxTimelineTweets') #200 # max number of
 # the id of the last tweet we pulled, in case hot2bot is closed
 lastId = config.get('options', 'lastId')
 
+replyToTweets = config.getboolean('options', 'replyToTweets')
 
 replyCount = config.getint('options', 'maxTimelineReplies')
 
@@ -230,7 +231,9 @@ def reply():
 
 
         subtweetReply = b.reply(subtweet(replyText))
-        subtweetReply = "@" + replyUser + " " + replyMentions + " " + cleanTweet(subtweetReply)
+        subtweetReplyPrefix = "@" + replyUser + " " + replyMentions + " "
+        subtweetReplyLen = 139 - len(subtweetReplyPrefix)
+        subtweetReply = cleanTweet(subtweetReply)[:subtweetReplyLen]
         print("reply id: " + replyId)
         api.PostUpdate(subtweetReply, in_reply_to_status_id=int(replyId))
         config.set("options", "lastReplyId", replyId)
@@ -270,7 +273,9 @@ if args.tweet:
 """
 while 1:
     timeCount = timeCount + 1
-    reply()
+    if replyToTweets:
+        reply()
+
     if useMastodon and learnMastodon:
         timeline = oauth.get('https://mastodon.social/api/v1/statuses/home', params=dict(limit=tweetCount, since_id=lastId)).json()
     else:

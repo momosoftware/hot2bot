@@ -15,15 +15,16 @@
 
 ## To Do
 
-* ~~Save lastId to config file in case of restart (in prep for replies as to not spam on restart)~~ done!
+* ~~Save lastId to config file in case of restart (in prep for replies as to not spam on restart)~~ ~~done! ~~ also done for replies!
 * Test Mastodon integration more fully, expand readme with instructions for it
-* Reply to tweets w/ a random seed word from their tweet
+* ~~Reply to tweets w/ a random seed word from their tweet~~ Done, need to limit number of replies to avoid talking to other bots forever, also need to clean up and make more options for them.
 * Reply to DMs in a similar fashion
+* tear main loop apart and refactor into reusable functions
 * log to file instead of console
 * More options to decide how it functions
 * * Learn-only mode
-* * Tweet-only mode (for uses ebooks bots trained with specific data)
-* * Allow for on-demand tweets (for cron schedules)
+* * ~~Tweet-only mode (for uses ebooks bots trained with specific data)~~ Done with the -t argument!
+* * ~~Allow for on-demand tweets (for cron schedules)~~ also done with -t, can specify a seed word after the argument for use in tweet generation.
 * More flexible timing, including random +-~5min offsets to tweet times
 * Allow a user to build a config on startup
 * Possibly write to use Classes and Methods instead of Functions
