@@ -54,10 +54,10 @@ tweetFreq  = config.getint('options', 'tweetFrequency') #60 # how many minutes b
 subtweetChance  = config.getint('options', 'chanceToSubtweet') #10 # percent chance that the bot subtweets
 topWords  = config.getint('options', 'topSubtweetSeeds') #5 # number of top words to potentially choose from for our seed phrase
 tweetCount  = config.getint('options', 'maxTimelineTweets') #200 # max number of tweets to pull from timeline, up to 200
-# the id of the last tweet we pulled, in case hot2bot is closed
-lastId = config.get('options', 'lastId')
 
 replyToTweets = config.getboolean('options', 'replyToTweets')
+
+learnTimeline = config.getboolean('options', 'learnTimeline')
 
 replyCount = config.getint('options', 'maxTimelineReplies')
 
@@ -94,7 +94,7 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data()
 
-def subtweet(subtweetCorpus):
+def subtweet(timeline):
     """
         Function: subtweet
 
@@ -105,9 +105,18 @@ def subtweet(subtweetCorpus):
             Takes string, normalizes to ascii, removes any stopwords/urls/mentions to make a new corpus
             Counts up all words in corpus, takes the most common words, randomly chooses one, and returns seed word
     """
+    subtweetCorpus = ""
+    for s in timeline:
+        if useMastodon:
+            statusText = strip_tags(s['content'])
+        else:
+            statusText = s.text
+
+        subtweetCorpus = subtweetCorpus + ' ' + statusText
+
     subtweetCorpus = re.sub(r'@\w+', r'', subtweetCorpus) # @mentions
     subtweetCorpus = re.sub(r'#\w+', r'', subtweetCorpus) # #hashtags
-    subtweetCorpus = re.sub(r'\(x[1-9]*\)', r'', subtweetCorpus) # (x1000) rt numbers from oysttyr
+    subtweetCorpus = re.sub(r'\(x[1-9]*\)', r'', subtweetCorpus) # (x1000) rt numbers from oysttyr, only necessary if you have a cobe.brain built from oysttyr or ttytter output
     subtweetCorpus = re.sub(r'http[s]?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', r'', subtweetCorpus) # urls
     subtweetCorpus = subtweetCorpus.replace('\n', ' ').replace('\r', '')
 
@@ -240,6 +249,45 @@ def reply():
     with open(configPath, "wb") as configFile:
         config.write(configFile)
 
+def grabTimeline():
+    # the id of the last tweet we pulled, in case hot2bot is closed
+    try:
+        lastId
+    except:
+        lastId = config.get('options', 'lastId')
+    if useMastodon and learnMastodon:
+        timeline = oauth.get('https://mastodon.social/api/v1/statuses/home', params=dict(limit=tweetCount, since_id=lastId)).json()
+    else:
+        timeline = api.GetHomeTimeline(exclude_replies=True, count=tweetCount, since_id=lastId)
+
+    return timeline
+
+
+def learn(timeline):
+    statuses = ""
+    for s in timeline:
+        if useMastodon:
+            statusText = strip_tags(s['content'])
+        else:
+            statusText = s.text
+
+        statuses = statuses + ' ' + statusText
+        if args.verbose:
+            print("learning " + statusText)
+        b.learn(statusText)
+
+    if useMastodon:
+        lastId = timeline[0]['id']
+    else:
+        lastId = timeline[-1].id
+
+    if args.verbose:
+        print(lastId)
+
+    config.set("options", "lastId", lastId)
+    with open(configPath, "wb") as configFile:
+        config.write(configFile)
+
 """
     special args cases
 
@@ -273,38 +321,16 @@ if args.tweet:
 """
 while 1:
     timeCount = timeCount + 1
+    timeline = grabTimeline()
     if replyToTweets:
         reply()
-
-    if useMastodon and learnMastodon:
-        timeline = oauth.get('https://mastodon.social/api/v1/statuses/home', params=dict(limit=tweetCount, since_id=lastId)).json()
-    else:
-        timeline = api.GetHomeTimeline(exclude_replies=True, count=tweetCount, since_id=lastId)
-
-    for s in timeline:
-        if useMastodon:
-            statusText = strip_tags(s['content'])
-        else:
-            statusText = s.text
-
-        statuses = statuses + ' ' + statusText
-        if args.verbose:
-            print("learning " + statusText)
-        b.learn(statusText)
-
-    if useMastodon:
-        lastId = timeline[0]['id']
-    else:
-        lastId = timeline[-1].id
-
-    if args.verbose:
-        print(lastId)
-    config.set("options", "lastId", lastId)
+    if learnTimeline:
+        learn(timeline)
     if timeCount >= tweetFreq:
         if args.verbose:
             print("TWEETING TIME")
         if random.randint(0,100) < subtweetChance:
-            tweet = b.reply(subtweet(statuses))
+            tweet = b.reply(subtweet(timeline))
         else:
             tweet = b.reply('')
 
@@ -322,8 +348,7 @@ while 1:
         seed = ""
         tweet = ""
 
-    with open(configPath, "wb") as configFile:
-        config.write(configFile)
+
 
     if args.verbose:
         print("sleeping now")
